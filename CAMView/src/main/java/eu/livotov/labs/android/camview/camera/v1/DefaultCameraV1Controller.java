@@ -9,6 +9,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import eu.livotov.labs.android.camview.camera.AbstractController;
@@ -136,13 +137,52 @@ public class DefaultCameraV1Controller extends AbstractController implements Cam
                 rawCameraObject.setPreviewDisplay(surfaceHolder);
             }
 
+            updatePictureSizeIfPreviewSizeIsBigger();
+
             //CameraUtilsV1.computeAspectRatiosForSurface(Integer.parseInt(camera.getCameraId()), rawCameraObject, surfaceView);
             CameraUtilsV1.setupSurfaceAndCameraForPreview(Integer.parseInt(camera.getCameraId()), rawCameraObject, surfaceView);
             rawCameraObject.startPreview();
             rechargePreviewBuffer();
         }
     }
+    private void updatePictureSizeIfPreviewSizeIsBigger() {
+        Camera.Parameters parameters = CameraUtilsV1.getMainCameraParameters(rawCameraObject);
+        if (isPreviewSizeBiggerThanPictureSize(parameters)) {
+            Size betterPictureSize = getClosestSupportedPictureSizeToPreviewSize(parameters);
+            parameters.setPictureSize(betterPictureSize.width, betterPictureSize.height);
+            rawCameraObject.setParameters(parameters);
+        }
+    }
 
+    private boolean isPreviewSizeBiggerThanPictureSize(Camera.Parameters parameters) {
+        boolean widthOk = parameters.getPreviewSize().width <= parameters.getPictureSize().width;
+        boolean heightOk = parameters.getPreviewSize().height <= parameters.getPictureSize().height;
+        return !(widthOk && heightOk);
+    }
+
+    private Size getClosestSupportedPictureSizeToPreviewSize(Camera.Parameters parameters) {
+        Size result = new Size(0, 0);
+        int previewHeight = parameters.getPreviewSize().height;
+        int previewWidth= parameters.getPreviewSize().width;
+
+        List<Camera.Size> pictureSizes = parameters.getSupportedPictureSizes();
+        for (Camera.Size size : pictureSizes) {
+            if (size.height >= previewHeight && size.width >= previewWidth) {
+                result.height = size.height;
+                result.width = size.width;
+            }
+        }
+        return result;
+    }
+
+    private static class Size {
+        public  int width;
+        public  int height;
+        public Size(int width, int height) {
+            this.width = width;
+            this.height= height;
+        }
+    }
     @TargetApi(10)
     private void adjustSurfaceHolderPre11()
     {
